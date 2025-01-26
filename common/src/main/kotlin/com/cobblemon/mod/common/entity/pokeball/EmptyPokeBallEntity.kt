@@ -211,31 +211,32 @@ class EmptyPokeBallEntity : ThrowableItemProjectile, PosableEntity, WaterDragMod
 
                 (this.owner as? ServerPlayer)?.let {
                     pokemonEntity.pokemon.level?.let { targetLevel ->
-                        if (listOf(
-                                it.party().get(0)?.level,
-                                it.party().get(1)?.level,
-                                it.party().get(2)?.level,
-                                it.party().get(3)?.level,
-                                it.party().get(4)?.level,
-                                it.party().get(5)?.level
-                            ).any { level -> level != null && level >= targetLevel })
-                        {
-                            val levelsMessage = listOf(
-                                it.party().get(0)?.level,
-                                it.party().get(1)?.level,
-                                it.party().get(2)?.level,
-                                it.party().get(3)?.level,
-                                it.party().get(4)?.level,
-                                it.party().get(5)?.level
-                            ).mapIndexed { index, level -> "Slot ${index + 1}: ${level ?: "Empty"}" }
-                                .joinToString(", ")
+                        val partyLevels = listOfNotNull(
+                            it.party().get(0)?.level,
+                            it.party().get(1)?.level,
+                            it.party().get(2)?.level,
+                            it.party().get(3)?.level,
+                            it.party().get(4)?.level,
+                            it.party().get(5)?.level
+                        )
 
+                        // Check if the party is completely empty
+                        if (partyLevels.isEmpty()) {
+                            it.sendSystemMessage(
+                                Component.translatable("cobblemon.capture.party_empty")
+                            )
+                            return drop()
+                        }
+
+                        val highestLevel = partyLevels.maxOrNull() ?: 0  // Get the highest level or default to 0
+
+                        if (highestLevel < targetLevel) {
                             it.sendSystemMessage(
                                 Component.translatable(
-                                    "cobblemon.capture.party_levels",
+                                    "cobblemon.capture.party_highest",
                                     targetLevel.toString(),
-                                    levelsMessage
-                                ).withStyle(ChatFormatting.RED)
+                                    highestLevel.toString()
+                                )
                             )
                             return drop()
                         }
