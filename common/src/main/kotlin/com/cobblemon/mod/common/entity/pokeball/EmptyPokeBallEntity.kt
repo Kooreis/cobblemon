@@ -49,6 +49,7 @@ import com.cobblemon.mod.common.pokemon.properties.UncatchableProperty
 import com.cobblemon.mod.common.util.asArrayValue
 import com.cobblemon.mod.common.util.*
 import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.network.protocol.Packet
@@ -72,6 +73,7 @@ import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CompletableFuture
+import net.minecraft.network.chat.Component
 import kotlin.compareTo
 
 class EmptyPokeBallEntity : ThrowableItemProjectile, PosableEntity, WaterDragModifier, Schedulable {
@@ -206,6 +208,40 @@ class EmptyPokeBallEntity : ThrowableItemProjectile, PosableEntity, WaterDragMod
                     owner?.sendSystemMessage(lang("capture.not_wild", pokemonEntity.exposedSpecies.translatedName).red())
                     return drop()
                 }
+
+                (this.owner as? ServerPlayer)?.let {
+                    pokemonEntity.pokemon.level?.let { targetLevel ->
+                        if (listOf(
+                                it.party().get(0)?.level,
+                                it.party().get(1)?.level,
+                                it.party().get(2)?.level,
+                                it.party().get(3)?.level,
+                                it.party().get(4)?.level,
+                                it.party().get(5)?.level
+                            ).any { level -> level != null && level >= targetLevel })
+                        {
+                            val levelsMessage = listOf(
+                                it.party().get(0)?.level,
+                                it.party().get(1)?.level,
+                                it.party().get(2)?.level,
+                                it.party().get(3)?.level,
+                                it.party().get(4)?.level,
+                                it.party().get(5)?.level
+                            ).mapIndexed { index, level -> "Slot ${index + 1}: ${level ?: "Empty"}" }
+                                .joinToString(", ")
+
+                            it.sendSystemMessage(
+                                Component.translatable(
+                                    "cobblemon.capture.party_levels",
+                                    targetLevel.toString(),
+                                    levelsMessage
+                                ).withStyle(ChatFormatting.RED)
+                            )
+                            return drop()
+                        }
+                    }
+                }
+
 
                 if (!UncatchableProperty.isCatchable(pokemonEntity)) {
                     owner?.sendSystemMessage(lang("capture.cannot_be_caught").red())
