@@ -113,9 +113,10 @@ class BattleOverlay : Gui(Minecraft.getInstance()), Schedulable {
     lateinit var messagePane: BattleMessagePane
     var hidePortraits = false
     override val schedulingTracker = SchedulingTracker()
-
+    private val battleStatusUI = BattleStatusUI()
     override fun render(context: GuiGraphics, tickCounter: DeltaTracker) {
         val tickDelta = tickCounter.realtimeDeltaTicks.takeIf { !Minecraft.getInstance()!!.isPaused } ?: 0F
+        battleStatusUI.render(context) // Render Pokémon names
         schedulingTracker.update(tickDelta / 20F)
         passedSeconds += tickDelta / 20
         if (passedSeconds > 100) {
