@@ -12,12 +12,15 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
-import kotlin.reflect.full.memberProperties
 
-// Helper function that uses reflection to read an "id" property from an object.
-private fun getId(item: Any?): String? {
-    return item?.let {
-        it::class.memberProperties.find { prop -> prop.name == "id" }?.getter?.call(it) as? String
+// Helper function to call getId() reflectively.
+private fun readId(obj: Any?): String? {
+    if (obj == null) return null
+    return try {
+        val method = obj::class.java.getMethod("getId")
+        method.invoke(obj) as? String
+    } catch (e: Exception) {
+        null
     }
 }
 
@@ -45,7 +48,7 @@ class BattleStatusUI {
         Stats.SPECIAL_ATTACK, Stats.SPECIAL_DEFENCE, Stats.SPEED
     )
 
-    // For non-HP stats, these IDs are used to count boosts.
+    // Map Stats -> "atk", "def", etc.
     private val statIdMap = mapOf(
         Stats.ATTACK to "atk",
         Stats.DEFENCE to "def",
@@ -54,24 +57,21 @@ class BattleStatusUI {
         Stats.SPEED to "spe"
     )
 
-    // Use the visual background texture.
-    private val battleStatusFrameResource = cobblemonResource("textures/gui/battle/stat_log_singles.png")
+    // Background texture (the same file you're using).
+    private val battleStatusFrameResource = cobblemonResource("textures/gui/battle/stat_log.png")
 
     fun render(context: GuiGraphics) {
-        // 1) Retrieve the current battle.
         val battleIdClient = CobblemonClient.battle?.battleId
         val battle = battleIdClient?.let { Cobblemon.battleRegistry.getBattle(it) } ?: return
 
-        // 2) Determine how many Pokémon per side (singles/doubles/triples).
         val battleType = battle.format.battleType.pokemonPerSide
 
-        // Build columns for each Pokémon on both sides.
         val playerColumns = mutableListOf<List<MutableComponent>>()
         val opponentColumns = mutableListOf<List<MutableComponent>>()
 
-        // 3) For each slot, retrieve that Pokémon’s boost contexts individually.
+        // Build columns for each slot, pulling boost contexts individually.
         for (i in 0 until battleType) {
-            // Player side (side1)
+            // Player side
             val playerSlot = battle.side1.actors.firstOrNull()?.activePokemon?.getOrNull(i)
             val playerPokemon = playerSlot?.battlePokemon?.effectedPokemon
             val playerPosBoostContext = playerSlot?.battlePokemon?.contextManager?.get(BattleContext.Type.BOOST)
@@ -86,7 +86,7 @@ class BattleStatusUI {
             )
             playerColumns.add(playerLines)
 
-            // Opponent side (side2)
+            // Opponent side
             val oppSlot = battle.side2.actors.firstOrNull()?.activePokemon?.getOrNull(i)
             val oppPokemon = oppSlot?.battlePokemon?.effectedPokemon
             val oppPosBoostContext = oppSlot?.battlePokemon?.contextManager?.get(BattleContext.Type.BOOST)
@@ -103,9 +103,10 @@ class BattleStatusUI {
             opponentColumns.add(oppLines)
         }
 
-        // 4) Decide how wide to make the backgrounds. Each column is 200 wide.
-        val baseBgWidth = 200
-        val baseBgHeight = 300 // Taller to fit more lines.
+        // Draw smaller backgrounds that more tightly wrap the text.
+        // Let’s do 160×110 for each column.
+        val baseBgWidth = 160
+        val baseBgHeight = 110
         val playerBgWidth = baseBgWidth * playerColumns.size
         val opponentBgWidth = baseBgWidth * opponentColumns.size
 
@@ -118,7 +119,7 @@ class BattleStatusUI {
         val opponentBgX = screenWidth - opponentBgWidth - 12
         val opponentBgY = playerBgY
 
-        // 5) Draw the backgrounds for each side.
+        // Draw the background for player columns
         context.blit(
             battleStatusFrameResource,
             playerBgX, playerBgY,
@@ -126,6 +127,7 @@ class BattleStatusUI {
             playerBgWidth, baseBgHeight,
             baseBgWidth, baseBgHeight
         )
+        // Draw the background for opponent columns
         context.blit(
             battleStatusFrameResource,
             opponentBgX, opponentBgY,
@@ -134,12 +136,12 @@ class BattleStatusUI {
             baseBgWidth, baseBgHeight
         )
 
-        // 6) Render text columns for each side.
+        // Now render each column’s lines.
         val fontResource = CobblemonResources.DEFAULT_LARGE
         val padding = 8
-        val lineHeight = 10 // spacing between lines
+        val lineHeight = 10
 
-        // Player columns.
+        // Player columns
         playerColumns.forEachIndexed { i, columnLines ->
             val colX = playerBgX + padding + i * baseBgWidth
             var currentY = playerBgY + padding
@@ -160,7 +162,7 @@ class BattleStatusUI {
             }
         }
 
-        // Opponent columns.
+        // Opponent columns
         opponentColumns.forEachIndexed { i, columnLines ->
             val colX = opponentBgX + padding + i * baseBgWidth
             var currentY = opponentBgY + padding
@@ -183,9 +185,7 @@ class BattleStatusUI {
     }
 
     /**
-     * Build a list of stat lines for one Pokémon.
-     * For non-HP stats, the base stat from StatProvider is multiplied by the boost multiplier,
-     * which is computed by counting the occurrences in the provided boost lists using their "id".
+     * Build the lines for each Pokémon’s stats, using reflection to read "id" from each boost.
      */
     private fun buildStatLines(
         title: MutableComponent,
@@ -207,23 +207,38 @@ class BattleStatusUI {
             if (stat == Stats.HP) {
                 lines.add(Component.literal("$label: $baseValue").withStyle { it.withColor(0xFFFFFF) })
             } else {
-                // Use the boost lists directly, computing the count by checking each boost's id.
                 val statId = statIdMap[stat] ?: ""
-                val plus = (posContext as? List<*>)?.count { getId(it) == statId } ?: 0
-                val minus = (negContext as? List<*>)?.count { getId(it) == statId } ?: 0
+                val plus = (posContext as? List<*>)?.count { readId(it) == statId } ?: 0
+                val minus = (negContext as? List<*>)?.count { readId(it) == statId } ?: 0
+
                 val boost = plus - minus
                 val multiplier = statMultipliers[boost] ?: 1.0
                 val newValue = (baseValue * multiplier).toInt()
 
-                val basePart = "$label: $baseValue "
-                val boostColor = when {
+                // Compose the line with partial coloring.
+                val identifier = Component.literal("$label:").withStyle { it.withBold(true).withColor(0xFFFFFF) }
+                val baseComp = Component.literal(" $baseValue ").withStyle { it.withColor(0xFFFFFF) }
+                val openParen = Component.literal("(").withStyle { it.withColor(0xFFFFFF) }
+                val multiplierColor = when {
                     multiplier > 1.0 -> 0x55FF55
                     multiplier < 1.0 -> 0xFF5555
                     else -> 0xFFFFFF
                 }
-                val boostPart = "(${multiplier}x) = $newValue"
-                val combined = Component.literal(basePart).withStyle { it.withColor(0xFFFFFF) }
-                combined.append(Component.literal(boostPart).withStyle { it.withColor(boostColor) })
+                val multiplierComp = Component.literal("$multiplier").withStyle { it.withColor(multiplierColor) }
+                val xComp = Component.literal("x").withStyle { it.withColor(0xFFFFFF) }
+                val closeParen = Component.literal(")").withStyle { it.withColor(0xFFFFFF) }
+                val equalsComp = Component.literal(" = ").withStyle { it.withColor(0xFFFFFF) }
+                val finalComp = Component.literal("$newValue").withStyle { it.withColor(multiplierColor) }
+
+                val combined = Component.literal("")
+                combined.append(identifier)
+                combined.append(baseComp)
+                combined.append(openParen)
+                combined.append(multiplierComp)
+                combined.append(xComp)
+                combined.append(closeParen)
+                combined.append(equalsComp)
+                combined.append(finalComp)
                 lines.add(combined)
             }
         }
