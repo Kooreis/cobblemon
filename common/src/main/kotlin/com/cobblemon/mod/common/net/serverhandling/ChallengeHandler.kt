@@ -13,6 +13,7 @@ import com.cobblemon.mod.common.api.battles.model.PokemonBattle
 import com.cobblemon.mod.common.api.events.CobblemonEvents
 import com.cobblemon.mod.common.api.events.pokemon.PokemonSeenEvent
 import com.cobblemon.mod.common.api.net.ServerNetworkPacketHandler
+import net.minecraft.network.chat.Component
 import com.cobblemon.mod.common.api.text.red
 import com.cobblemon.mod.common.battles.BattleBuilder
 import com.cobblemon.mod.common.battles.BattleTypes
@@ -47,12 +48,43 @@ object ChallengeHandler : ServerNetworkPacketHandler<BattleChallengePacket> {
             }
         } ?: return
 
-        val leadingPokemon = player.party()[packet.selectedPokemonId]?.uuid ?: return   // validate id
-        if (targetedEntity is PokemonEntity && player.canInteractWith(targetedEntity, Cobblemon.config.battleWildMaxDistance) && targetedEntity.canBattle(player)) {
-            BattleBuilder.pve(player, targetedEntity, leadingPokemon)
-                .ifSuccessful { battle -> this.flagAsSeen(battle, targetedEntity) }
-                .ifErrored { it.sendTo(player) { it.red() } }
+        val leadingPokemon = player.party()[packet.selectedPokemonId]?.uuid ?: return // validate id
+
+        if (targetedEntity is PokemonEntity && player.canInteractWith(targetedEntity, Cobblemon.config.battleWildMaxDistance)) {
+            // Check if the entity is marked as Unbattleable
+            if (targetedEntity.entityData.get(PokemonEntity.UNBATTLEABLE)) {
+                player.sendSystemMessage(Component.translatable("cobblemon.abnormal_unbattleable"))
+                return
+            }
+
+            val targetLevel = targetedEntity.pokemon.level ?: return
+            val partyLevels = player.party().mapNotNull { it?.level }
+
+            if (partyLevels.isEmpty()) {
+                player.sendSystemMessage(Component.translatable("cobblemon.doing_dumb_shit"))
+                return
+            }
+
+            val highestLevel = partyLevels.maxOrNull() ?: 0
+
+            if ((highestLevel < targetLevel) && (targetedEntity.pokemon.isLegendary() || targetedEntity.pokemon.isMythical())) {
+                player.sendSystemMessage(
+                    Component.translatable(
+                        "cobblemon.capture.party_highest",
+                        targetLevel.toString(),
+                        highestLevel.toString()
+                    )
+                )
+                return
+            }
+
+            if (targetedEntity.canBattle(player)) {
+                BattleBuilder.pve(player, targetedEntity, leadingPokemon)
+                    .ifSuccessful { battle -> this.flagAsSeen(battle, targetedEntity) }
+                    .ifErrored { it.sendTo(player) { it.red() } }
+            }
         }
+
         else if (targetedEntity is ServerPlayer) {
             ChallengeManager.setLead(player, leadingPokemon)
             val challenge =

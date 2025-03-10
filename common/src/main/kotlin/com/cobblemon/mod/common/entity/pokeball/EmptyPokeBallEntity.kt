@@ -209,6 +209,12 @@ class EmptyPokeBallEntity : ThrowableItemProjectile, PosableEntity, WaterDragMod
                     return drop()
                 }
 
+                if (battle == null && (pokemonEntity.pokemon.isLegendary() || pokemonEntity.pokemon.isMythical()))
+                {
+                    owner?.sendSystemMessage(lang("capture.legendary_or_mythical", pokemonEntity.exposedSpecies.translatedName).red())
+                    return drop()
+                }
+
                 (this.owner as? ServerPlayer)?.let {
                     pokemonEntity.pokemon.level?.let { targetLevel ->
                         val partyLevels = listOfNotNull(

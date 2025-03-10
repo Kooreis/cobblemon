@@ -985,9 +985,7 @@ open class PokemonEntity(
 
     @Suppress("UNUSED_PARAMETER")
     fun canBattle(player: Player): Boolean {
-        if (entityData.get(UNBATTLEABLE)) {
-            return false
-        } else if (isBusy) {
+        if (isBusy) {
             return false
         } else if (battleId != null) {
             return false
