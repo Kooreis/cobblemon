@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 Cobblemon Contributors
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
 package com.cobblemon.mod.common.client.gui.battle
 
 import com.cobblemon.mod.common.Cobblemon
@@ -48,7 +55,7 @@ class BattleStatusUI {
      *  - Row 1: ATK + SP. ATK
      *  - Row 2: DEF + SP. DEF
      *  - Row 3: SPD alone
-     *  - Row 4: Ability & Nature on the same line
+     *  - Row 4: Ability with description
      */
     private val statOrder = listOf(
         Stats.ATTACK,
@@ -200,12 +207,12 @@ class BattleStatusUI {
     }
 
     /**
-     * Builds lines for one Pokémon’s stats using a 3-row layout plus an Ability/Nature row:
+     * Builds lines for one Pokémon’s stats using a 3-row layout plus an Ability row:
      *
      * Row 1: ATK + SP. ATK
      * Row 2: DEF + SP. DEF
      * Row 3: SPD alone
-     * Row 4: Ability & Nature on the same line
+     * Row 4: Ability with description
      */
     private fun buildStatLines(
         pkmn: Pokemon?,
@@ -217,17 +224,15 @@ class BattleStatusUI {
             return listOf(Component.literal("No Pokémon found."))
         }
 
-        // Evs might be a custom class, e.g. data class Evs(...) with fields
-        val evs = pkmn.evs // The object that holds EV fields
         val abilityObj = pkmn.ability
-        val natureObj = pkmn.nature
+        val abilityDescKey = pkmn.ability.description // Assuming descriptionKey is the LangKey
 
         // Build lines for each relevant stat
-        val atkLine = buildSingleStatLine(pkmn, Stats.ATTACK, posContext, negContext, evs)
-        val spAtkLine = buildSingleStatLine(pkmn, Stats.SPECIAL_ATTACK, posContext, negContext, evs)
-        val defLine = buildSingleStatLine(pkmn, Stats.DEFENCE, posContext, negContext, evs)
-        val spDefLine = buildSingleStatLine(pkmn, Stats.SPECIAL_DEFENCE, posContext, negContext, evs)
-        val spdLine = buildSingleStatLine(pkmn, Stats.SPEED, posContext, negContext, evs)
+        val atkLine = buildSingleStatLine(pkmn, Stats.ATTACK, posContext, negContext)
+        val spAtkLine = buildSingleStatLine(pkmn, Stats.SPECIAL_ATTACK, posContext, negContext)
+        val defLine = buildSingleStatLine(pkmn, Stats.DEFENCE, posContext, negContext)
+        val spDefLine = buildSingleStatLine(pkmn, Stats.SPECIAL_DEFENCE, posContext, negContext)
+        val spdLine = buildSingleStatLine(pkmn, Stats.SPEED, posContext, negContext)
 
         // Row 1: ATK + SP. ATK
         val row1 = mergeTwoStatsSideBySide(atkLine, spAtkLine, spacing = 3)
@@ -238,30 +243,27 @@ class BattleStatusUI {
         // Row 3: SPD alone
         // Just add SPD line directly
 
-        // Row 4: Ability + Nature
-        val abilityNatureLine = buildAbilityNatureLine(abilityObj, natureObj)
+        // Row 4: Ability with description
+        val abilityLine = buildAbilityLine(abilityObj, abilityDescKey)
 
         // Collect final lines
         val lines = mutableListOf<MutableComponent>()
         row1?.let { lines.add(it) }
         row2?.let { lines.add(it) }
         spdLine?.let { lines.add(it) }
-        abilityNatureLine?.let { lines.add(it) }
+        abilityLine?.let { lines.add(it) }
 
         return lines
     }
 
     /**
-     * Builds a single stat line, e.g. "ATK: 56 (1.0x) = 56 (252 EVs)"
-     * - If EV is 0, show "(0 EVs)" in red
-     * - If EV is > 0, show "(NN EVs)" in green
+     * Builds a single stat line, e.g. "ATK: 56 (1.0x) = 56"
      */
     private fun buildSingleStatLine(
         pkmn: Pokemon,
         stat: Stats,
         posContext: Any?,
-        negContext: Any?,
-        evsObj: Any? // We'll interpret this as a custom "Evs" class
+        negContext: Any?
     ): MutableComponent? {
         val label = statLabelMap[stat] ?: return null
         val baseValue = Cobblemon.statProvider.getStatForPokemon(pkmn, stat) ?: 0
@@ -273,10 +275,6 @@ class BattleStatusUI {
         val boost = plus - minus
         val multiplier = statMultipliers[boost] ?: 1.0
         val newValue = (baseValue * multiplier).toInt()
-
-        // Retrieve EV from the custom Evs class
-        val evVal = getEvValue(evsObj, stat)
-        val evColor = if (evVal == 0) 0xFF5555 else 0x55FF55
 
         // Build partial coloring
         val identifier = Component.literal("$label:").withStyle { it.withBold(true).withColor(0xFFFFFF) }
@@ -293,10 +291,6 @@ class BattleStatusUI {
         val equalsComp = Component.literal(" = ").withStyle { it.withColor(0xFFFFFF) }
         val finalComp = Component.literal("$newValue").withStyle { it.withColor(multiplierColor) }
 
-        // EV portion e.g. " (252 EVs)"
-        val evString = " ($evVal EVs)"
-        val evComp = Component.literal(evString).withStyle { it.withColor(evColor) }
-
         val combined = Component.literal("")
         combined.append(identifier)
         combined.append(baseComp)
@@ -306,49 +300,26 @@ class BattleStatusUI {
         combined.append(closeParen)
         combined.append(equalsComp)
         combined.append(finalComp)
-        combined.append(evComp) // Add the EV info
         return combined
     }
 
     /**
-     * Extracts the EV value for a given stat from your custom Evs object.
-     * Example:
-     *   data class Evs(val hp: Int, val attack: Int, val defence: Int, ...)
+     * Creates a single line: "Ability: <AB> - <DESC>"
+     * - "Ability:" is bold.
+     * - Ability name (e.g., "Static") is underlined.
+     * - Description is resolved from the LangKey.
      */
-    private fun getEvValue(evsObj: Any?, stat: Stats): Int {
-        if (evsObj == null) return 0
-        return try {
-            // If you have a data class, do a 'when' on the stat to call the correct property:
-            when (stat) {
-                Stats.HP -> evsObj::class.java.getMethod("getHp").invoke(evsObj) as? Int
-                Stats.ATTACK -> evsObj::class.java.getMethod("getAttack").invoke(evsObj) as? Int
-                Stats.DEFENCE -> evsObj::class.java.getMethod("getDefence").invoke(evsObj) as? Int
-                Stats.SPECIAL_ATTACK -> evsObj::class.java.getMethod("getSpecialAttack").invoke(evsObj) as? Int
-                Stats.SPECIAL_DEFENCE -> evsObj::class.java.getMethod("getSpecialDefence").invoke(evsObj) as? Int
-                Stats.SPEED -> evsObj::class.java.getMethod("getSpeed").invoke(evsObj) as? Int
-                else -> 0
-            } ?: 0
-        } catch (ex: Exception) {
-            0
-        }
-    }
-
-    /**
-     * Creates a single line: "Ability: <AB>    Nature: <NA>"
-     * with bold labels. If ability/nature are null, display "???".
-     */
-    private fun buildAbilityNatureLine(
+    private fun buildAbilityLine(
         abilityObj: Any?,
-        natureObj: Any?
+        abilityDescKey: String?
     ): MutableComponent? {
-        // If both are null, we can skip
-        if (abilityObj == null && natureObj == null) {
+        if (abilityObj == null || abilityDescKey == null) {
             return null
         }
 
         // Retrieve ability name. Adjust if you have a direct .name property or getDisplayName, etc.
         val abilityName = try {
-            abilityObj?.let {
+            abilityObj.let {
                 val method = it::class.java.getMethod("getName")
                 method.invoke(it) as? String
             }
@@ -356,31 +327,18 @@ class BattleStatusUI {
             null
         } ?: "???"
 
-        // Retrieve nature name similarly
-        val natureName = try {
-            natureObj?.let {
-                val method = it::class.java.getMethod("getName")
-                method.invoke(it) as? String
-            }
-        } catch (ex: Exception) {
-            null
-        } ?: "???"
+        // Resolve the description from the LangKey
+        val abilityDesc = Component.translatable(abilityDescKey).string
 
-        // Build: "Ability: X" (bold) + spacing + "Nature: Y" (bold)
+        // Build: "Ability:" (bold) + " <AB>" (underlined) + " - <DESC>"
         val abilityLabel = Component.literal("Ability:").withStyle { it.withBold(true).withColor(0xFFFFFF) }
-        val abilityVal = Component.literal(" $abilityName ").withStyle { it.withColor(0xFFFFFF) }
-
-        val natureLabel = Component.literal("Nature:").withStyle { it.withBold(true).withColor(0xFFFFFF) }
-        val natureVal = Component.literal(" $natureName").withStyle { it.withColor(0xFFFFFF) }
-
-        val space = Component.literal("    ") // some spacing between them
+        val abilityNameComp = Component.literal(" $abilityName ").withStyle { it.withUnderlined(true).withColor(0xFFFFFF) }
+        val descComp = Component.literal(" - $abilityDesc").withStyle { it.withColor(0xFFFFFF) }
 
         val line = Component.literal("")
         line.append(abilityLabel)
-        line.append(abilityVal)
-        line.append(space)
-        line.append(natureLabel)
-        line.append(natureVal)
+        line.append(abilityNameComp)
+        line.append(descComp)
 
         return line
     }
