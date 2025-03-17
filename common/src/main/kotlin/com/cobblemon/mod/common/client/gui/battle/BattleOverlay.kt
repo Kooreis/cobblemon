@@ -15,6 +15,7 @@ import com.cobblemon.mod.common.api.scheduling.Schedulable
 import com.cobblemon.mod.common.api.scheduling.SchedulingTracker
 import com.cobblemon.mod.common.api.text.bold
 import com.cobblemon.mod.common.api.text.text
+import com.cobblemon.mod.common.battle.BattleStatusLogic
 import com.cobblemon.mod.common.client.CobblemonClient
 import com.cobblemon.mod.common.client.CobblemonResources
 import com.cobblemon.mod.common.client.battle.ActiveClientBattlePokemon
@@ -113,10 +114,10 @@ class BattleOverlay : Gui(Minecraft.getInstance()), Schedulable {
     lateinit var messagePane: BattleMessagePane
     var hidePortraits = false
     override val schedulingTracker = SchedulingTracker()
-    private val battleStatusUI = BattleStatusUI()
+    private val battleStatusUI = BattleStatsUI()
     override fun render(context: GuiGraphics, tickCounter: DeltaTracker) {
         val tickDelta = tickCounter.realtimeDeltaTicks.takeIf { !Minecraft.getInstance()!!.isPaused } ?: 0F
-        battleStatusUI.render(context) // Render Pokémon names
+        battleStatusUI.render(context) // Custom UI
         schedulingTracker.update(tickDelta / 20F)
         passedSeconds += tickDelta / 20
         if (passedSeconds > 100) {
@@ -168,6 +169,7 @@ class BattleOverlay : Gui(Minecraft.getInstance()), Schedulable {
         val mc = Minecraft.getInstance()
 
         val battlePokemon = activeBattlePokemon.battlePokemon ?: return
+        battleStatusUI.render(context) // Custom UI
         val battle = CobblemonClient.battle ?: return
         val slotCount = battle.battleFormat.battleType.slotsPerActor
         val playerNumberOffset = (activeBattlePokemon.getActorShowdownId()[1].digitToInt() - 1) / 2 * 10
@@ -252,6 +254,7 @@ class BattleOverlay : Gui(Minecraft.getInstance()), Schedulable {
         val portraitOffsetY = if (isCompact) COMPACT_PORTRAIT_OFFSET_Y else PORTRAIT_OFFSET_Y
         val portraitDiameter = if (isCompact) COMPACT_PORTRAIT_DIAMETER else PORTRAIT_DIAMETER
         val infoOffsetX = if (isCompact) COMPACT_INFO_OFFSET_X else INFO_OFFSET_X
+
         val portraitStartX = x + if (!reversed) portraitOffsetX else { tileWidth - portraitDiameter - portraitOffsetX }
         val matrixStack = context.pose()
         blitk(
