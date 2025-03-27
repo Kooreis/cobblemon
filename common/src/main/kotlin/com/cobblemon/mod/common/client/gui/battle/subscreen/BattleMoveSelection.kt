@@ -181,6 +181,7 @@ class BattleMoveSelection(
             if (!selectable) return
             moveSelection.playDownSound(Minecraft.getInstance().soundManager)
             moveSelection.battleGUI.selectAction(moveSelection.request, response)
+
         }
     }
 

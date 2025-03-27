@@ -22,12 +22,12 @@
     "undiscovered"
   ],
   "baseStats": {
-    "hp": 80,
+    "hp": 300,
     "attack": 50,
-    "defence": 100,
-    "special_attack": 100,
-    "special_defence": 200,
-    "speed": 50
+    "defence": 400,
+    "special_attack": 400,
+    "special_defence": 400,
+    "speed": 250
   },
   "evYield": {
     "hp": 0,

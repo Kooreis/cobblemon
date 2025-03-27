@@ -192,12 +192,12 @@
         "h:turboblaze"
       ],
       "baseStats": {
-        "hp": 125,
-        "attack": 120,
-        "defence": 90,
-        "special_attack": 170,
-        "special_defence": 100,
-        "speed": 95
+        "hp": 325,
+        "attack": 220,
+        "defence": 250,
+        "special_attack": 370,
+        "special_defence": 250,
+        "speed": 180
       },
       "evYield": {
         "hp": 0,
@@ -352,12 +352,12 @@
         "h:teravolt"
       ],
       "baseStats": {
-        "hp": 125,
-        "attack": 170,
-        "defence": 100,
-        "special_attack": 120,
-        "special_defence": 90,
-        "speed": 95
+        "hp": 325,
+        "attack": 325,
+        "defence": 250,
+        "special_attack": 325,
+        "special_defence": 250,
+        "speed": 180
       },
       "evYield": {
         "hp": 0,
