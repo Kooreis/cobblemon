@@ -33,7 +33,7 @@ object BattleStatusLogic {
         6 to 4.0
     )
 
-    // Order in which stats may be displayed (if needed elsewhere).
+    // Order in which stats may be displayed (if needed elsewhere). Works as of 3/27
     private val statOrder = listOf(
         Stats.ATTACK,
         Stats.SPECIAL_ATTACK,
