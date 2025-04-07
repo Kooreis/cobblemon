@@ -198,6 +198,7 @@ object CobblemonNetwork {
         val list = mutableListOf<PacketRegisterInfo<*>>()
 
         // Pokemon Update Packets
+        list.add(PacketRegisterInfo(BattleStatusSyncPacket.ID, BattleStatusSyncPacket::decode, BattleStatusSyncHandler))
         list.add(PacketRegisterInfo(FriendshipUpdatePacket.ID, FriendshipUpdatePacket::decode, PokemonUpdatePacketHandler()))
         list.add(PacketRegisterInfo(MoveSetUpdatePacket.ID, MoveSetUpdatePacket::decode, PokemonUpdatePacketHandler()))
         list.add(PacketRegisterInfo(NatureUpdatePacket.ID, NatureUpdatePacket::decode, PokemonUpdatePacketHandler()))

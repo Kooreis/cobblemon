@@ -47,6 +47,7 @@ import com.cobblemon.mod.common.entity.npc.NPCEntity
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import com.cobblemon.mod.common.net.messages.client.battle.BattleEndPacket
 import com.cobblemon.mod.common.net.messages.client.battle.BattleMessagePacket
+import com.cobblemon.mod.common.net.messages.client.battle.BattleStatusSyncPacket
 import com.cobblemon.mod.common.pokemon.evolution.progress.DefeatEvolutionProgress
 import com.cobblemon.mod.common.pokemon.evolution.progress.LastBattleCriticalHitsEvolutionProgress
 import com.cobblemon.mod.common.pokemon.evolution.requirements.DefeatRequirement
@@ -83,7 +84,15 @@ open class PokemonBattle(
     val onEndHandlers: MutableList<(PokemonBattle) -> Unit> = mutableListOf()
 
     val battlePartyStores = mutableListOf<PlayerPartyStore>()
-
+    val sides: Iterable<BattleSide>
+        get() = listOf(side1, side2)
+    val actors: Iterable<BattleActor>
+        get() = sides.flatMap { it.actors.toList() }
+    val activePokemon: Iterable<ActiveBattlePokemon>
+        get() = actors.flatMap { it.activePokemon }
+    val playerUUIDs: Iterable<UUID>
+        get() = actors.flatMap { it.getPlayerUUIDs() }
+    val players = playerUUIDs.mapNotNull { it.getPlayer() }
     init {
         side1.battle = this
         side2.battle = this
@@ -95,17 +104,12 @@ open class PokemonBattle(
                     .forEach { it.reset() }
             }
         }
-    }
 
-    val sides: Iterable<BattleSide>
-        get() = listOf(side1, side2)
-    val actors: Iterable<BattleActor>
-        get() = sides.flatMap { it.actors.toList() }
-    val activePokemon: Iterable<ActiveBattlePokemon>
-        get() = actors.flatMap { it.activePokemon }
-    val playerUUIDs: Iterable<UUID>
-        get() = actors.flatMap { it.getPlayerUUIDs() }
-    val players = playerUUIDs.mapNotNull { it.getPlayer() }
+        // 🔥 ADD THIS AT THE END OF INIT
+        players.forEach { player ->
+            CobblemonNetwork.sendPacketToPlayer(player, BattleStatusSyncPacket(battleId))
+        }
+    }
     val spectators = mutableSetOf<UUID>()
 
     val battleId = UUID.randomUUID()

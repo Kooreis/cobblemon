@@ -20,7 +20,7 @@ import com.cobblemon.mod.common.net.messages.server.battle.BattleSelectActionsPa
 import java.util.UUID
 
 class ClientBattle(
-    val battleId: UUID,
+    var battleId: UUID,
     val battleFormat: BattleFormat
 ) {
     var minimised = true
